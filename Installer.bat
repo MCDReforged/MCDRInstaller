@@ -3,7 +3,8 @@ pushd "%~dp0"
 
 :: Init
 color 0b
-set TITLE=MCDR 一键配置包 By Alex3236
+set VERSION=1.0.0
+set TITLE=MCDR 一键配置包 ver%VERSION% By Alex3236
 title %TITLE%
 
 :: Check administor permission
