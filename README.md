@@ -13,3 +13,6 @@ MCDR 安装器，仅适用于 Windows 平台
 1. 新建空文件夹，放入并运行脚本
 2. 根据提示操作
 3. 完成 MCDR 安装
+
+## Download
+到[发布页面](https://github.com/MCDReforged/MCDRInstaller/releases)下载即可。
