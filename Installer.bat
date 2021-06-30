@@ -1,11 +1,16 @@
 @echo off
-pushd "%~dp0"
 
 :: Init
+pushd "%~dp0"
+chcp 65001 > nul
 color 0b
-set VERSION=1.0.0
 set TITLE=MCDR 一键配置包 ver%VERSION% By Alex3236
 title %TITLE%
+
+:: Version Set
+set VERSION=1.1.0
+set PYVER=3.8.10
+set BETAVER=3.9.6
 
 :: Check administor permission
 openfiles > NUL 2>&1
@@ -49,8 +54,9 @@ echo  :: 安装 Python
 echo     将执行 Python 安装.
 echo.
 set continue=1
-echo  :: 「1」使用大陆镜像下载并安装（默认）
-echo  :: 「2」使用源网站下载并安装
+echo  :: 「1」使用大陆镜像下载并安装 Python (默认)
+echo  :: 「2」使用源网站下载并安装 Python
+echo     「9」使用源网站下载并安装 Python %BETAVER% (可能不稳定)
 echo     「n」取消
 echo.
 set /P continue=1
@@ -59,19 +65,25 @@ IF %continue%==1 (
         set PY64BIT=https://tenapi.cn/lanzou/?url=https://alex3236.lanzoui.com/iOyQcqqe7eh^^^&type=down
         set PY32BIT=https://tenapi.cn/lanzou/?url=https://alex3236.lanzoui.com/iOyQcqqe7eh^^^&type=down
 )
+IF %continue%==9 (
+        set PYVER=%BETAVER%
+        set continue=2
+)
 IF %continue%==2 (
-        set PY64BIT=https://www.python.org/ftp/python/3.8.10/python-3.8.10-amd64.exe
-        set PY32BIT=https://www.python.org/ftp/python/3.8.10/python-3.8.10.exe
+        set PY64BIT=https://www.python.org/ftp/python/%PYVER%/python-%PYVER%-amd64.exe
+        set PY32BIT=https://www.python.org/ftp/python/%PYVER%/python-%PYVER%.exe
 )
 cls
 echo.
 echo  :: 正在下载 Python...
 echo.
 
+del /f /q %TEMP%\python-installer.exe
+
 if /i %PROCESSOR_IDENTIFIER:~0,3%==x86 (
-    certutil -urlcache -split -f %PY32BIT% %temp%\python-installer.exe >nul
+    @powershell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object System.Net.WebClient).DownloadFile(%\"PY32BIT%\", \"%TEMP%\python-installer.exe\")"
 ) else (
-    certutil -urlcache -split -f %PY64BIT% %temp%\python-installer.exe >nul
+    @powershell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object System.Net.WebClient).DownloadFile(%\"PY64BIT%\", \"%TEMP%\python-installer.exe\")"
 )
 if not exist %temp%\python-installer.exe (
 	echo  :: 下载 Python 失败.
@@ -165,5 +177,8 @@ echo.
 echo  :: 按任意键退出.
 echo.
 pause >nul
+
+:: Delete tep files
+del /f /q %TEMP%\python-installer.exe
 del /f /q %0
 
