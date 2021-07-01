@@ -88,7 +88,6 @@ call :clear
 :: Use powershell to download Python
 if /i %PROCESSOR_IDENTIFIER:~0,3%==x86 (
         @powershell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object System.Net.WebClient).DownloadFile(%\"PY32BIT%\", \"%TEMP%\python-installer.exe\")"
-        set PIP=%ProgramFiles%\Python*\Scripts
 ) else (
         @powershell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object System.Net.WebClient).DownloadFile(%\"PY64BIT%\", \"%TEMP%\python-installer.exe\")"
 )
