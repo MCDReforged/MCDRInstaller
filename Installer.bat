@@ -1,16 +1,21 @@
 @echo off
 
+:: MCDR Installer by Alex3236
+:: https://github.com/MCDReforged/MCDRInstaller
+:: For Windows only!
+
+:: Constant Set
+set VERSION=1.2.0
+set PYVER=3.8.10
+set BETAVER=3.9.6
+:: RefreshEnv.bat in base64 format
+set RefreshEnv_B64=QGVjaG8gb2ZmCmNoY3AgNjUwMDEgPiBudWwKZ290byBtYWluCjpTZXRGcm9tUmVnCiAgICAiJVdpbkRpciVcU3lzdGVtMzJcUmVnIiBRVUVSWSAiJX4xIiAvdiAiJX4yIiA+ICIlVEVNUCVcX2VudnNldC50bXAiIDI+TlVMCiAgICBmb3IgL2YgInVzZWJhY2txIHNraXA9MiB0b2tlbnM9MiwqIiAlJUEgSU4gKCIlVEVNUCVcX2VudnNldC50bXAiKSBkbyAoCiAgICAgICAgZWNoby9zZXQgIiV+Mz0lJUIiCiAgICApCiAgICBnb3RvIDpFT0YKOkdldFJlZ0VudgogICAgIiVXaW5EaXIlXFN5c3RlbTMyXFJlZyIgUVVFUlkgIiV+MSIgPiAiJVRFTVAlXF9lbnZnZXQudG1wIgogICAgZm9yIC9mICJ1c2ViYWNrcSBza2lwPTIiICUlQSBJTiAoIiVURU1QJVxfZW52Z2V0LnRtcCIpIGRvICgKICAgICAgICBpZiAvSSBub3QgIiUlfkEiPT0iUGF0aCIgKAogICAgICAgICAgICBjYWxsIDpTZXRGcm9tUmVnICIlfjEiICIlJX5BIiAiJSV+QSIKICAgICAgICApCiAgICApCiAgICBnb3RvIDpFT0YKOm1haW4KICAgIGVjaG8vQGVjaG8gb2ZmID4iJVRFTVAlXF9lbnYuY21kIgogICAgY2FsbCA6R2V0UmVnRW52ICJIS0xNXFN5c3RlbVxDdXJyZW50Q29udHJvbFNldFxDb250cm9sXFNlc3Npb24gTWFuYWdlclxFbnZpcm9ubWVudCIgPj4gIiVURU1QJVxfZW52LmNtZCIKICAgIGNhbGwgOkdldFJlZ0VudiAiSEtDVVxFbnZpcm9ubWVudCI+PiIlVEVNUCVcX2Vudi5jbWQiID4+ICIlVEVNUCVcX2Vudi5jbWQiCiAgICBjYWxsIDpTZXRGcm9tUmVnICJIS0xNXFN5c3RlbVxDdXJyZW50Q29udHJvbFNldFxDb250cm9sXFNlc3Npb24gTWFuYWdlclxFbnZpcm9ubWVudCIgUGF0aCBQYXRoX0hLTE0gPj4gIiVURU1QJVxfZW52LmNtZCIKICAgIGNhbGwgOlNldEZyb21SZWcgIkhLQ1VcRW52aXJvbm1lbnQiIFBhdGggUGF0aF9IS0NVID4+ICIlVEVNUCVcX2Vudi5jbWQiCiAgICBlY2hvL3NldCAiUGF0aD0lJVBhdGhfSEtMTSUlOyUlUGF0aF9IS0NVJSUiID4+ICIlVEVNUCVcX2Vudi5jbWQiCiAgICBkZWwgL2YgL3EgIiVURU1QJVxfZW52c2V0LnRtcCIgMj5udWwKICAgIGRlbCAvZiAvcSAiJVRFTVAlXF9lbnZnZXQudG1wIiAyPm51bAogICAgU0VUICJPcmlnaW5hbFVzZXJOYW1lPSVVU0VSTkFNRSUiCiAgICBTRVQgIk9yaWdpbmFsQXJjaGl0ZWN0dXJlPSVQUk9DRVNTT1JfQVJDSElURUNUVVJFJSIKICAgIGNhbGwgIiVURU1QJVxfZW52LmNtZCIKICAgIGRlbCAvZiAvcSAiJVRFTVAlXF9lbnYuY21kIiAyPm51bAogICAgU0VUICJVU0VSTkFNRT0lT3JpZ2luYWxVc2VyTmFtZSUiCiAgICBTRVQgIlBST0NFU1NPUl9BUkNISVRFQ1RVUkU9JU9yaWdpbmFsQXJjaGl0ZWN0dXJlJSI=
+
 :: Init
 pushd "%~dp0"
 chcp 65001 > nul
 color 0b
-set TITLE=MCDR 一键配置包 ver%VERSION% By Alex3236
-title %TITLE%
-
-:: Version Set
-set VERSION=1.1.0
-set PYVER=3.8.10
-set BETAVER=3.9.6
+title MCDR 一键配置包 ver%VERSION% By Alex3236
 
 :: Check administor permission
 openfiles > NUL 2>&1
@@ -78,12 +83,14 @@ echo.
 echo  :: 正在下载 Python...
 echo.
 
-del /f /q %TEMP%\python-installer.exe
+call :clear
 
+:: Use powershell to download Python
 if /i %PROCESSOR_IDENTIFIER:~0,3%==x86 (
-    @powershell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object System.Net.WebClient).DownloadFile(%\"PY32BIT%\", \"%TEMP%\python-installer.exe\")"
+        @powershell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object System.Net.WebClient).DownloadFile(%\"PY32BIT%\", \"%TEMP%\python-installer.exe\")"
+        set PIP=%ProgramFiles%\Python*\Scripts
 ) else (
-    @powershell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object System.Net.WebClient).DownloadFile(%\"PY64BIT%\", \"%TEMP%\python-installer.exe\")"
+        @powershell -NoProfile -ExecutionPolicy Bypass -Command "(New-Object System.Net.WebClient).DownloadFile(%\"PY64BIT%\", \"%TEMP%\python-installer.exe\")"
 )
 if not exist %temp%\python-installer.exe (
 	echo  :: 下载 Python 失败.
@@ -95,14 +102,20 @@ if not exist %temp%\python-installer.exe (
 echo.
 echo :: 正在安装 Python...
 echo.
-%temp%\python-installer.exe /passive /PrependPath=1
+:: Call python-installer.exe to install Python
+%temp%\python-installer.exe /passive /PrependPath=1 /InstallAllUsers=1
+echo.
+echo :: 刷新环境变量...
+echo.
+@powershell -Command "& {[System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String('%RefreshEnv_B64%')) | out-file %TEMP%\RefreshEnv.bat -encoding utf8}"
+call %TEMP%\RefreshEnv.bat
 goto install_mcdr
 
 :check_mcdr
 echo.
 python -c "import mcdreforged" > nul
 if %errorlevel%==0 (
-	echo  :: 检测到现有 MCDR.
+	echo  :: 检测到现有 MCDR 包.
 	goto config_mcdr
 )
 
@@ -166,7 +179,7 @@ python -m mcdreforged > nul
 echo  :: 配置完成！ 生成的脚本如下:
 echo     「Start-MCDR.bat」一键运行 MCDR
 echo     「Update-MCDR.bat」一键升级 MCDR
-echo     「MCDR-PluginCatalogue.url」打开 MCDR 插件库
+echo     「MCDR-PluginCatalogue.url」打开 MCDR 官方插件库
 echo.
 echo  :: 现在，把你的服务端文件放入「server」文件夹里，然后修改配置文件「config.yml」以满足你的需求。
 echo     完成后，启动 MCDR,开始你的 MCDR 之旅.
@@ -176,9 +189,12 @@ echo     脚本作者为 Alex3236, Bilibili-UID=275212628
 echo.
 echo  :: 按任意键退出.
 echo.
+call :clear
 pause >nul
-
-:: Delete tep files
-del /f /q %TEMP%\python-installer.exe
 del /f /q %0
+
+:clear
+del /f /q %TEMP%\python-installer.exe
+del /f /q %TEMP%\RefreshEnv.bat
+
 
