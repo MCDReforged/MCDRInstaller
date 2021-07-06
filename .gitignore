@@ -1,0 +1,13 @@
+# Python cache
+__pycache__
+
+# Build files
+build*
+dist
+*.spec
+
+# wxFormBuilder files
+*.fbp
+
+# Test files
+test
