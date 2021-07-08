@@ -1,16 +1,16 @@
 import os
 import re
-import sys
 import shutil
+import sys
 import webbrowser
 import winreg
 
 import requests
 import ruamel.yaml as yaml
 import wx
-from mcdreforged.api.decorator import new_thread
 
 from libs.func import *
+from libs.new_thread import new_thread
 from libs.semver import Version, VersionParsingError, VersionRequirement
 from libs.settings import *
 from ui.main import InstallFrame, SetFrame

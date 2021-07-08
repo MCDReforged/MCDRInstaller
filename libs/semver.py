@@ -1,3 +1,7 @@
+# semver.py
+# "Stolen" from https://github.com/Fallen-Breath/MCDReforged/blob/master/mcdreforged/plugin/meta/version.py
+# Chek and compare versions.
+
 import re
 from typing import Callable, List
 
