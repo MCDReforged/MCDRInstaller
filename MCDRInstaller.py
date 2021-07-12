@@ -205,10 +205,10 @@ class SetUI(SetFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # if not is_admin(): # TODO
-        #     message_box(self, '错误', '请以管理员身份运行，否则无法进行安装操作！', wx.ICON_ERROR)
-        #     self.Close()
-        #     return
+        if not is_admin():
+            message_box(self, '错误', '请以管理员身份运行，否则无法进行安装操作！', wx.ICON_ERROR)
+            self.Close()
+            return
         if not ask_box(self, '在开始之前，你需要明白一些事...', LICENSE_TEXT):
             self.Close()
             return
