@@ -8,6 +8,7 @@ import winreg
 import requests
 import ruamel.yaml as yaml
 import wx
+from lxml import etree
 
 from libs.func import *
 from libs.new_thread import new_thread
@@ -45,19 +46,23 @@ class InstallUI(InstallFrame):
             self.configure_mcdr()
             if self.target['fabric']:
                 self.install_fabric()
+            self.subprogress.SetValue(100)
             message_box(self, '提示', '执行完成！\n享受你的 MCDR 之旅！', wx.ICON_INFORMATION)
         except Exception as e:
             message_box(self, '错误', '执行时发现错误。\n错误详情：' + str(e), wx.ICON_ERROR)
-            raise
+            exit_app()
+            return
         finally:
             shutil.rmtree(temp())
             self.Close()
+            exit_app()
+            return
 
     def install_java(self):
         self.progress_text.SetLabel('安装 Java')
 
         self.subprogress_text.SetLabel('查找 AdoptOpenJRE 下载地址')
-        self.progress.SetValue(0)
+        self.subprogress.Pulse()
         filename = temp('java_installer.msi')
         link = JAVA_LINK.format(self.target['java'])
         data = requests.get(link).json()
@@ -68,7 +73,9 @@ class InstallUI(InstallFrame):
         for i in release['assets']:
             if i['name'].endswith('.msi') and 'jre' in i['name'] and 'x64' in i['name']:  # TODO: 优化检测
                 download_link = i['browser_download_url']  # https://github.com/.../<name>.msi
+                download_link = GITHUB_DOWN_MIRROR(download_link)
                 hash_link = download_link + '.sha256.txt'  # https://github.com/.../<name>.msi.sha256.txt
+                hash_link = GITHUB_DOWN_MIRROR(hash_link)
 
         self.subprogress_text.SetLabel('下载 AdoptOpenJRE' + release_name)
         if not download_file(filename, download_link, self.subprogress):
@@ -77,83 +84,94 @@ class InstallUI(InstallFrame):
         cert = cert.splitlines()[0].split(' ')[0]  # Format: "<sha256> <filename>\n"
 
         self.subprogress_text.SetLabel('验证已下载文件')
-        self.subprogress.SetValue(0)
+        self.subprogress.Pulse()
+        # self.subprogress.SetValue(0)
         if not verify_sha256(filename, cert):
             raise InstalltionError('JRE 安装文件损坏。')
-        self.subprogress.SetValue(100)
+        # self.subprogress.SetValue(100)
 
         self.msi_install(filename)
 
     def msi_install(self, filename):
         self.subprogress_text.SetLabel('安装 AdoptOpenJRE')
-        self.subprogress.SetValue(0)
+        self.subprogress.Pulse()
         if run_command(['msiexec', '/i', filename, 'INSTALLLEVEL=1', '/passive'])[0]:
             raise InstalltionError('安装 JRE 时发生错误。')
-        self.subprogress.SetValue(100)
+        # self.subprogress.SetValue(100)
 
         self.refresh_progress()
 
     def install_python(self):
         self.subprogress.SetValue(0)
         self.progress_text.SetLabel('安装 Python')
-        self.subprogress_text.SetLabel('下载 Python ' + self.target['python'])
+        self.subprogress_text.SetLabel('下载 Python')
         filename = temp('python_installer.exe')
-        if not download_file(filename, PYTHON_LINK.format(self.target['python']), self.subprogress):
+        if not download_file(filename, self.target['python'], self.subprogress):
             raise InstalltionError('下载 Python 安装文件失败。')
 
-        self.subprogress.SetValue(0)
+        # self.subprogress.SetValue(0)
         if not have_cert(filename):
             raise InstalltionError('Python 安装文件损坏。')
-        self.subprogress.SetValue(100)
+        # self.subprogress.SetValue(100)
 
-        self.subprogress.SetValue(0)
-        self.subprogress_text.SetLabel('安装 Python ' + self.target['python'])
-        if run_command([filename, '/passive', '/InstallAllUsers=1', '/CompileAll=1', '/PrependPath=1'])[0]:
+        # self.subprogress.SetValue(0)
+        self.subprogress.Pulse()
+        self.subprogress_text.SetLabel('安装 Python ')
+        if run_command([filename, '/passive', 'InstallAllUsers=1', 'CompileAll=1', 'PrependPath=1'])[0]:
             raise InstalltionError('安装 Python 时发生错误。')
-        self.subprogress.SetValue(80)
+        # self.subprogress.SetValue(80)
         self.subprogress_text.SetLabel('解除 MAX_PATH 限制')
         try:
-            winreg.SetValue(winreg.HKEY_LOCAL_MACHINE,
-                            "SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled", winreg.REG_DWORD, '1')
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\FileSystem", 0, winreg.KEY_WRITE)
+            winreg.SetValueEx(key, 'LongPathsEnabled',0 , winreg.REG_DWORD, 1)
         except Exception:
             message_box(self, '警告', '解除 MAX_PATH 失败。\n这理论上不会有太大影响，让我们继续...', wx.ICON_WARNING)
-        self.subprogress.SetValue(100)
+        # self.subprogress.SetValue(100)
 
         self.refresh_progress()
 
     def install_mcdr(self):
-        self.subprogress.SetValue(0)
+        self.subprogress.Pulse()
         self.progress_text.SetLabel('安装 MCDReforged')
         self.subprogress_text.SetLabel('配置 pip')
-        run_command('python -m pip config set global.index-url ' + PIP_MIRROR)
-        self.subprogress.SetValue(20)
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment")
+        os.environ['Path'] = winreg.QueryValueEx(key, 'Path')[0]
+        if run_command('python -m pip config set global.index-url ' + PIP_MIRROR)[0]:
+            raise InstalltionError('配置 pip 时发生错误。')
+        # self.subprogress.SetValue(20)
         self.subprogress_text.SetLabel('使用 pip 安装 MCDReforged')
         if run_command('python -m pip install mcdreforged --upgrade')[0]:
             raise InstalltionError('安装 MCDR 时发生错误。')
-        self.subprogress.SetValue(100)
+        # self.subprogress.SetValue(100)
 
         self.refresh_progress()
 
     def configure_mcdr(self):
-        self.subprogress.SetValue(0)
+        # self.subprogress.SetValue(0)
+        self.subprogress.Pulse()
         self.progress_text.SetLabel('部署 MCDReforged')
         os.chdir(self.target['path'])
 
         self.subprogress_text.SetLabel('执行 python 指令以部署 MCDReforged')
-        if run_command('python -m mcdreforged', cwd='D:\\Temp\\新建文件夹')[0]:
+        if run_command('python -m mcdreforged')[0]:
             raise InstalltionError('部署 MCDR 时发生错误。')
-        self.subprogress.SetValue(80)
+        # self.subprogress.SetValue(80)
 
         self.subprogress_text.SetLabel('修改 MCDReforged 配置文件')
         try:
-            with open(os.path.join('config.yml'), 'r+', encoding='utf8') as f:
+            with open('config.yml', 'r', encoding='utf8') as f:
                 data = yaml.safe_load(f)
-                data['language'] = 'zh_cn'
-                data['start_command'] = 'java -Xms1G -Xmx2G -jar fabric-server-launch.jar nogui'
+            data['language'] = 'zh_cn'
+            data['start_command'] = 'java -Xms1G -Xmx2G -jar fabric-server-launch.jar nogui'
+            with open('config.yml', 'w', encoding='utf8') as f:
                 yaml.safe_dump(data, f)
         except Exception as e:
-            raise InstalltionError('配置 MCDR 时发生错误：' + e)
-        self.subprogress.SetValue(100)
+            raise InstalltionError('配置 MCDR 时发生错误：' + str(e))
+        # self.subprogress.SetValue(90)
+
+        create_url_file('MCDR 插件库', MCDR_PLG_URL)
+        create_mcdr_scripts('启动 MCDR', '更新 MCDR')
+        # self.subprogress.SetValue(100)
 
         self.refresh_progress()
 
@@ -163,18 +181,20 @@ class InstallUI(InstallFrame):
                 if i['stable']:
                     return i['url']
         os.chdir(os.path.join(self.target['path'], 'server'))
-        self.subprogress.SetValue(0)
+        # self.subprogress.SetValue(0)
+        self.subprogress.Pulse()
         self.progress_text.SetLabel('安装 Fabric')
         self.subprogress_text.SetLabel('下载 Fabric Installer')
         filename = temp('fabric_installer.jar')
         if not download_file(filename, get_fabric_link(), self.subprogress):
             raise InstalltionError('下载 Fabric Installer 失败。')
 
-        self.subprogress.SetValue(0)
+        self.subprogress.Pulse()
         self.subprogress_text.SetLabel(f"安装 Fabric Server (for Minecraft {self.target['fabric']})")
         if run_command(['java', '-jar', filename, 'server', '-mcversion', self.target['fabric'], '-downloadMinecraft'])[0]:
             raise InstalltionError('安装 Fabric 时发生错误。')
-        self.subprogress.SetValue(100)
+        create_minecraft_eula()
+        # self.subprogress.SetValue(100)
 
         self.refresh_progress()
 
@@ -192,8 +212,7 @@ class SetUI(SetFrame):
         if not ask_box(self, '在开始之前，你需要明白一些事...', LICENSE_TEXT):
             self.Close()
             return
-        self.check_env()
-        self.load_versions()
+        self.init_versions()
         self.path_btn.Bind(wx.EVT_BUTTON, self.set_path)
         self.cancel_btn.Bind(wx.EVT_BUTTON, exit_app)
         self.fabric_box.Bind(wx.EVT_CHOICE, self.auto_select)
@@ -218,31 +237,32 @@ class SetUI(SetFrame):
         else:
             self.java_check.Enable()
 
-    @new_thread
     def load_versions(self):
         def get_python_versions():
-            last_version = VersionRequirement('~0.0.0')
             support = []
-            version_list = [i['ref'].split('/')[-1].replace('v', '') for i in requests.get(PYTHON_CHECK_LINK).json()]
-            version_list = [i for i in version_list if re.match('^[0-9.]*$', i)]
-            version_list.sort(reverse=False)
-            print(version_list)
+            version_list = list(self.all_python.keys())
+            version_list.sort(key=lambda s: Version(s))
+            last_version = version_list[0]
+            last_sversion = last_version.split('.')
             for version in version_list:
                 try:
-                    if self.mcdr_requirement.accept(version):
-                        if version == version_list[-1]:
-                            support.append(version)
-                        elif not last_version.accept(version):
-                            support.append(str(last_version)[1:])
-                    last_version = VersionRequirement('~' + version)
+                    sversion = version.split('.')
+                    if not (sversion[0] == last_sversion[0] and sversion[1] == last_sversion[1]):
+                        if self.mcdr_requirement.accept(version) and self.mcdr_requirement.accept(last_version):
+                            print(last_version, version)
+                            support.append(last_version)
+                    last_sversion = sversion
+                    last_version = version
                 except VersionParsingError:
                     continue
+            print(support)
             return support
+
         try:
-            self.Disable()
             self.status_bar.SetStatusText(u'加载 Python 版本...')
-            PYTHON_CHECK_List = get_python_versions()
-            self.python_box.AppendItems(list(PYTHON_CHECK_List))
+            self.all_python = get_all_python()
+            self.python_versions = get_python_versions()
+            self.python_box.AppendItems([i for i in self.python_versions])
             self.python_box.Select(self.python_box.GetCount() - 1)
             self.status_bar.SetStatusText(u'加载 Minecraft 版本...')
             minecraft_versions = requests.get(FABRIC_CHECK_LINK.format('game')).json()
@@ -252,8 +272,9 @@ class SetUI(SetFrame):
         except Exception as e:
             message_box(self, '错误', f'获取版本列表失败。如非网络错误，请将此错误提交 Issue。\n错误详情：{e}', wx.ICON_ERROR)
             self.status_bar.SetStatusText(u'错误。')
+            exit_app()
+            return
         else:
-            self.Enable()
             self.auto_select()
             self.status_bar.SetStatusText(u'就绪。')
 
@@ -263,59 +284,73 @@ class SetUI(SetFrame):
             with open(file, 'w', encoding='utf8') as f:
                 f.write(TEST_SCRIPT)
             return file
-        self.status_bar.SetStatusText(u'检查系统环境...')
-        java = python = mcdr = None
-        # 检测 Java 是否安装
-        cmd = run_command('java --version')
-        if not cmd[0]:
-            java = cmd[1].split('\n')[0]
-            self.java_check.SetValue(False)
-            self.java_text.SetLabel('已安装: ' + str(java))
-            self.java_text.Show()
-            self.env['java'] = java
-        # 检测 Python 是否安装
-        cmd = run_command('python --version')
-        if not cmd[0]:
-            python = Version(cmd[1].lower().replace('python', '').strip())
-            self.python_check.SetValue(False)
-            self.python_text.SetLabel('已安装: ' + str(python))
-            self.env['python'] = python
-            # 检测 MCDR 是否安装
-            cmd = run_command('python ' + extract_testfile())
+        try:
+            self.status_bar.SetStatusText(u'检查系统环境...')
+            java = python = mcdr = None
+            # 检测 Java 是否安装
+            cmd = run_command('java --version')
             if not cmd[0]:
-                mcdr = Version(cmd[1])
-                self.mcdr_check.SetValue(False)
-                self.mcdr_text.SetLabel('已安装: ' + str(mcdr))
-                self.env['mcdr'] = mcdr
-        else:
-            self.python_check.SetValue(True)
-            self.python_check.Disable()
+                java = cmd[1].split('\n')[0]
+                self.java_check.SetValue(False)
+                self.java_text.SetLabel('已安装: ' + str(java))
+                self.java_text.Show()
+                self.env['java'] = java
+            # 检测 Python 是否安装
+            cmd = run_command('python --version')
+            if not cmd[0]:
+                python = Version(cmd[1].lower().replace('python', '').strip())
+                self.python_check.SetValue(False)
+                self.python_text.SetLabel('已安装: ' + str(python))
+                self.env['python'] = python
+                # 检测 MCDR 是否安装
+                cmd = run_command('python ' + extract_testfile())
+                if not cmd[0]:
+                    mcdr = Version(cmd[1])
+                    self.mcdr_check.SetValue(False)
+                    self.mcdr_text.SetLabel('已安装: ' + str(mcdr))
+                    self.env['mcdr'] = mcdr
+            else:
+                self.python_check.SetValue(True)
+                self.python_check.Disable()
 
-        # 获取 MCDR 兼容的 Python 版本
-        data = requests.get(MCDR_CHECK_LINK).json()['info']
-        requirement = VersionRequirement(data['requires_python'])
-        self.mcdr_requirement = requirement
-        # 检测已安装 Python 兼容性
-        if self.env['python']:
-            latest_mcdr = Version(data['version'])
-            # self.env['python'] = Version('0.0.0')
-            # self.env['mcdr'] = Version('0.0.0')
-            if not requirement.accept(self.env['python']):
-                self.python_text.SetLabel(f"不兼容最新 MCDR (已安装 {self.env['python']}, 需要 {requirement})")
-                self.python_text.SetForegroundColour(YELLOW)
-                message_box(
-                    self, '错误',
-                    f"当前 Python 与 MCDR 不兼容。 (已安装 {self.env['python']}, 需要 {requirement})\n请更新 Python。",
-                    wx.ICON_WARNING)
-                webbrowser.open(PYTHONUPDATER_LINK)
-                exit_app()
-                return
-            # 检测 MCDR 是否最新
-            if self.env['mcdr'] and latest_mcdr > self.env['mcdr']:
-                self.mcdr_check.SetLabel('更新 MCDReforged')
-                self.mcdr_check.SetValue(True)
-                self.mcdr_text.SetLabel(f"不是最新 (已安装 {self.env['mcdr']}, 最新 {latest_mcdr})")
-                self.mcdr_text.SetForegroundColour(YELLOW)
+            # 获取 MCDR 兼容的 Python 版本
+            data = requests.get(MCDR_CHECK_LINK).json()['info']
+            requirement = VersionRequirement(data['requires_python'])
+            self.mcdr_requirement = requirement
+            # 检测已安装 Python 兼容性
+            if self.env['python']:
+                latest_mcdr = Version(data['version'])
+                # self.env['python'] = Version('0.0.0')
+                # self.env['mcdr'] = Version('0.0.0')
+                if not requirement.accept(self.env['python']):
+                    self.python_text.SetLabel(f"不兼容最新 MCDR (已安装 {self.env['python']}, 需要 {requirement})")
+                    self.python_text.SetForegroundColour(YELLOW)
+                    message_box(
+                        self, '错误',
+                        f"当前 Python 与 MCDR 不兼容。 (已安装 {self.env['python']}, 需要 {requirement})\n请更新 Python。",
+                        wx.ICON_WARNING)
+                    webbrowser.open(PYTHONUPDATER_LINK)
+                    exit_app()
+                    return
+                # 检测 MCDR 是否最新
+                if self.env['mcdr'] and latest_mcdr > self.env['mcdr']:
+                    self.mcdr_check.SetLabel('更新 MCDReforged')
+                    self.mcdr_check.SetValue(True)
+                    self.mcdr_text.SetLabel(f"不是最新 (已安装 {self.env['mcdr']}, 最新 {latest_mcdr})")
+                    self.mcdr_text.SetForegroundColour(YELLOW)
+        except Exception as e:
+            message_box(self, '错误', f'检查系统环境失败。如非网络错误，请将此错误提交 Issue。\n错误详情：{e}', wx.ICON_ERROR)
+            self.status_bar.SetStatusText(u'错误。')
+            exit_app()
+            return
+
+    
+    @new_thread
+    def init_versions(self):
+        self.Disable()
+        self.check_env()
+        self.load_versions()
+        self.Enable()
 
     def set_path(self, *args):
         self.path_text.SetValue(choose_folder(self))
@@ -327,7 +362,7 @@ class SetUI(SetFrame):
         target = {
             'path': self.path_text.GetValue(),
             'java': self.java_box.GetStringSelection() if self.java_check.IsChecked() else None,
-            'python': self.python_box.GetStringSelection() if self.python_check.IsChecked() else None,
+            'python': self.all_python[self.python_box.GetStringSelection()] if self.python_check.IsChecked() else None,
             'mcdr': self.mcdr_check.IsChecked(),
             'fabric': self.fabric_box.GetStringSelection() if self.fabric_check.IsChecked() else None
         }
