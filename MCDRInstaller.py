@@ -255,6 +255,7 @@ class SetUI(SetFrame):
                     last_version = version
                 except VersionParsingError:
                     continue
+            support.append(version_list[-1])
             print(support)
             return support
 
